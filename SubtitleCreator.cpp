@@ -360,18 +360,16 @@ QImage SubtitleCreator::renderBox(int targetLine, bool lineSpaceFalling, double 
 void SubtitleCreator::separateLine(QString line) {
 	toDraw.clear();
 	LineType baseType = NORMAL;
-	if (!line.startsWith(QChar('-'))) {
+	auto i = line.indexOf(QChar(':'));
+	if (i >= 0 && i < 20) {
 		isBackground = false;
-		auto i = line.indexOf(QChar(':'));
-		if (i >= 0 && i < 20) {
-			toDraw.push_back(paintText(line.left(i).trimmed(), TITLE));
-			line = line.mid(i + 1);
-		} else {
-			// no title
-			toDraw.push_back(paintText(" ", TITLE));
-		}
+		toDraw.push_back(paintText(line.left(i).trimmed(), TITLE));
+		line = line.mid(i + 1);
 	} else {
-		line = line.mid(1);
+		// no title
+		if (line.startsWith('-')) {
+			line = line.mid(1);
+		}
 		toDraw.push_back(QImage()); // dummy null img
 		isBackground = true;
 	}

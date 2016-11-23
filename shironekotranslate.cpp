@@ -31,7 +31,7 @@ ShironekoTranslate::ShironekoTranslate(QWidget* parent)
 
 	sourceFile = QFileDialog::getOpenFileName(this, tr("Select Source"));
 	destinationFile = QFileDialog::getSaveFileName(this, tr("Select Target"), "", tr("Video File (*.avi)"));
-	if(!player.loadVideo(QDir::toNativeSeparators(sourceFile), destinationFile)) {
+	if(!player.loadVideo(QDir::toNativeSeparators(sourceFile), QDir::toNativeSeparators(destinationFile))) {
 		reportError(tr("Cannot open file "));
 		ui.startButton->setEnabled(false);
 		ui.tickButton->setEnabled(false);
