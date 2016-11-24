@@ -14,7 +14,7 @@ class SubtitleCreator :
 	public QObject {
 	Q_OBJECT
 public:
-	SubtitleCreator(QSize mainFrameSize);
+	SubtitleCreator(QObject* parent, QSize mainFrameSize);
 	~SubtitleCreator();
 	void addText(QString content, int framePos);
 	void endText(int framePos);

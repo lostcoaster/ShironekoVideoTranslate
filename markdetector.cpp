@@ -1,7 +1,8 @@
 #include "markdetector.h"
+#include <QDebug>
 
-MarkDetector::MarkDetector()
-	: countThree(0), subtitleStarted(false) {
+MarkDetector::MarkDetector(QObject * parent)
+	:MatProcessor(parent), countThree(0), subtitleStarted(false) {
 	erodeElement = getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
 	dilateElement = getStructuringElement(cv::MORPH_RECT, cv::Size(6, 6));
 	pinPointX = pinPointY = 0.5;
@@ -59,7 +60,9 @@ bool MarkDetector::detectColorChanged(cv::Mat m) {
 	bool ret = false;
 	if (!lastScanline.empty()) {
 		cv::absdiff(scanline, lastScanline, lastScanline);
-		ret = (cv::sum(lastScanline) / lastScanline.rows)[0] > 20;
+		int detectRet = (cv::sum(lastScanline) / lastScanline.rows)[0];
+		qDebug() << detectRet;
+		ret = detectRet > 15;
 	}
 	lastScanline = scanline;
 	return ret;

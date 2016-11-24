@@ -6,5 +6,6 @@
 class MatProcessor : public QObject {
 	Q_OBJECT
 public:
+	MatProcessor(QObject *parent) : QObject(parent) {}
 	virtual void processImage(cv::Mat) = 0;
 };

@@ -9,38 +9,37 @@
 #include <QtDebug>
 #include "finalizercreater.h"
 #include <QApplication>
+#include "ffmpegdirector.h"
+#include "convertsourcevideo.h"
+#include "mergeaudioencoder.h"
+
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 1
+#define VERSION_BUILD 0
 
 ShironekoTranslate::ShironekoTranslate(QWidget* parent)
-	: QMainWindow(parent){
+	: QMainWindow(parent), player(this){
 	ui.setupUi(this);
+	setWindowTitle(tr("Translate") + " " +
+		QString::number(VERSION_MAJOR) + "." +
+		QString::number(VERSION_MINOR) + "." +
+		QString::number(VERSION_BUILD) + " - by lc"
+	);
+}
 
-	QObject::connect(ui.startButton, SIGNAL(clicked()), this, SLOT(startPauseVideo()));
-	QObject::connect(ui.stopButton, SIGNAL(clicked()), this, SLOT(finish()));
-	QObject::connect(&player, SIGNAL(newFrame(QImage, QImage)), this, SLOT(updateImage(QImage, QImage)));
-	QObject::connect(&player, SIGNAL(errorReport(QString)), this, SLOT(reportError(QString)));
-	QObject::connect(&player, SIGNAL(infoReport(QString)), this, SLOT(showInfos(QString)));
-	QObject::connect(ui.tickButton, SIGNAL(clicked()), this, SLOT(startSubstitledVideo()));
+void ShironekoTranslate::initialize() {
 
-//	subtitle.reset(new SubtitleCreator(QSize(ui.resultImageDown->width(), ui.resultImageDown->height() + ui.resultImageUp->height())));
-
-	detector = std::make_shared<MarkDetector>();
+	detector = std::make_shared<MarkDetector>(this);
 	player.addProcessor(detector);
 
 	firstSubtitle = true;
 	finishCountDown = -1;
 
-	sourceFile = QFileDialog::getOpenFileName(this, tr("Select Source"));
-	destinationFile = QFileDialog::getSaveFileName(this, tr("Select Target"), "", tr("Video File (*.avi)"));
-	if(!player.loadVideo(QDir::toNativeSeparators(sourceFile), QDir::toNativeSeparators(destinationFile))) {
-		reportError(tr("Cannot open file "));
-		ui.startButton->setEnabled(false);
-		ui.tickButton->setEnabled(false);
-	}
+	selectAndLoadVideo();
 
-	subtitle = std::make_unique<SubtitleCreator>(player.getFrameSize());
-//	QObject::connect(subtitle.get(), SIGNAL(newImage(QImage)), this, SLOT(updateBottomImage(QImage)));
-	QObject::connect(subtitle.get(), SIGNAL(newImage(QImage)), &player, SLOT(onSubtitleFrameArrive(QImage)), Qt::DirectConnection);
-	QObject::connect(&player, SIGNAL(newFrame(QImage, QImage)), subtitle.get(), SLOT(requestNewFrame())); // syncing the frames between player and subtitle
+	subtitle = std::make_unique<SubtitleCreator>(this, player.getFrameSize());
+
+	initConnections();
 }
 
 void ShironekoTranslate::updateImage(QImage full, QImage upper) {
@@ -138,64 +137,119 @@ void ShironekoTranslate::finishVideo() {
 	int frames = player.getFrameNumber();
 	detector->finish();
 	subtitle->stopBuilder(frames - 1); // just try to skip animation more reliable
+	player.releaseAll();
 	int startFrame = subtitle->getFirstSubtitleStart();
-	// select save file
-	//	while (destinationFile.isEmpty()) {
-	//		destinationFile = QFileDialog::getSaveFileName(this, tr("Select Target"), "", tr("Video File (*.avi)"));
-	//		if (destinationFile.isEmpty()) {
-	//			QMessageBox box(QMessageBox::Information, tr("Alert"), tr("Really want to discard all changes?"), QMessageBox::Yes | QMessageBox::No);
-	//			if(box.exec() == QMessageBox::Yes) {
-	//				break;
-	//			}
-	//		}
-	//	}
 	if (!destinationFile.isEmpty()) {
-		// destroy the signals, although not so necessary
-		//		ui.startButton->disconnect();
-		//		ui.tickButton->disconnect();
-		//		this->disconnect();
-		//		player.disconnect();
-		//		subtitle->disconnect();
-		//		detector->disconnect();
-		//
-		//		QObject::connect(&player, SIGNAL(errorReport(QString)), this, SLOT(showInfos(QString)));
-		//		QObject::connect(&player, SIGNAL(infoReport(QString)), this, SLOT(showInfos(QString)));
-		//		QObject::connect(subtitle.get(), SIGNAL(newImage(QImage)), &player, SLOT(onSubtitleFrameArrive(QImage)), Qt::DirectConnection);
-		//		// reload video
-		//		player.startRecord();
-		//		player.loadVideo(QDir::toNativeSeparators(sourceFile), QDir::toNativeSeparators(destinationFile));
-		//		subtitle->startBuilder(); // todo use sync'd here
-		//		subtitle->restartTrace();
-		//		// note that the connection between subtitle and player is still active atm, that's why the following works
-		//		QProgressDialog progress(tr("Generating..."), tr("Cancel"), 0, frames);
-		//		progress.setWindowModality(Qt::WindowModal);
-		//		int numFrame = 0;
-		//		do {
-		//			++numFrame;
-		//			subtitle->advanceTrace(numFrame);
-		//			subtitle->requestNewFrame();
-		//			player.triggerFrameManually();
-		//			qDebug() << "frame " << numFrame << " done";
-		//			if (progress.wasCanceled()) {
-		//				break;
-		//			}
-		//			progress.setValue(numFrame);
-		//			progress.show();
-		//		} while (player.isPlaying() && frames > numFrame);
-		FinalizerCreater fc;
-		fc.setSourceFile(sourceFile);
-		fc.setTargetName(destinationFile);
-		fc.setStart(static_cast<double>(startFrame) / player.getFrameRate());
-		fc.generateCommand(QFileInfo(destinationFile).dir().absoluteFilePath("AddAudioAndFinalize.bat"));
-		QMessageBox box(QMessageBox::Information, tr("Finish"), tr("Output finished."), QMessageBox::Ok);
+//		FinalizerCreater fc(this);
+//		fc.setSourceFile(sourceFile);
+//		fc.setTargetName(destinationFile);
+//		fc.setStart(static_cast<double>(startFrame) / player.getFrameRate());
+//		fc.generateCommand(QFileInfo(destinationFile).dir().absoluteFilePath("AddAudioAndFinalize.bat"));
+//		QMessageBox box(QMessageBox::Information, tr("Finish"), tr("Output finished."), QMessageBox::Ok);
+//		box.exec();
+		MergeAudioEncoder m(this, static_cast<double>(startFrame) / player.getFrameRate(), 0.0, static_cast<double>(frames-startFrame+1) / player.getFrameRate());
+		while(!m.exec()) {
+			QMessageBox box(QMessageBox::Warning, tr("Exit"), tr("Confirm discard all work?"), QMessageBox::Ok | QMessageBox::Cancel);
+			if(box.exec()) {
+				emit quitApplication();
+			}
+		}
+		FfmpegDirector f(this, "ffmpeg.exe");
+		QProgressDialog p(tr("Merging"), QString(), 0, 100, this);
+		p.setWindowModality(Qt::WindowModal);
+		QObject::connect(&f, SIGNAL(updateProgress(int)), &p, SLOT(setValue(int)));
+
+		QMap<QString, double> parameters;
+		parameters["duration"] = m.getDuration();
+		parameters["audioStart"] = m.getStartTime() + m.getDelayTime();
+		f.addAudioAndEncode(sourceFile, destinationFile, parameters);
+		p.show();
+		while (!f.isFinished()) {
+			f.waitForFinish(30000);
+		}
+		QDir().remove(destinationFile); // we have a .mp4 file now
+		QMessageBox box(QMessageBox::Warning, tr("Exit"), tr("Finish! You can delete now."), QMessageBox::Ok);
 		box.exec();
-		//		subtitle->stopBuilder(-1);
 	}
 	QApplication::exit();
 }
 
+bool ShironekoTranslate::fixVariableFps() {
+	ConvertSourceVideo c(nullptr); // note that we can't use parent here, as the mainform's event loop is not started yet
+//	c.setWindowModality(Qt::WindowModal);
+	bool ret = c.exec();
+	if(!ret) {
+		reportError(tr("Aborted conversion"));
+	}
+	FfmpegDirector f(this, "ffmpeg.exe");
+	QProgressDialog p(tr("Fixing"), QString(), 0, 100, this);
+	p.setWindowModality(Qt::WindowModal);
+	QObject::connect(&f, SIGNAL(updateProgress(int)), &p, SLOT(setValue(int)));
 
-void ShironekoTranslate::reportError(QString error) const {
+	QString tempFile = QFileInfo(sourceFile).dir().absoluteFilePath("ori_" + QFileInfo(sourceFile).fileName());
+	ret = QDir().rename(QDir::toNativeSeparators(sourceFile), QDir::toNativeSeparators(tempFile));
+	f.convertToFixedFrameRate(tempFile, c.frameRate, sourceFile);
+	p.show();
+	while(!f.isFinished()) {
+		f.waitForFinish(30000);
+	}
+	QDir().remove(tempFile);
+	return true;
+}
+
+void ShironekoTranslate::initConnections() {
+	QObject::connect(ui.startButton, SIGNAL(clicked()), this, SLOT(startPauseVideo()));
+	QObject::connect(ui.stopButton, SIGNAL(clicked()), this, SLOT(finish()));
+	QObject::connect(&player, SIGNAL(newFrame(QImage, QImage)), this, SLOT(updateImage(QImage, QImage)));
+	QObject::connect(&player, SIGNAL(errorReport(QString)), this, SLOT(reportError(QString)));
+	QObject::connect(&player, SIGNAL(infoReport(QString)), this, SLOT(showInfos(QString)));
+	QObject::connect(ui.tickButton, SIGNAL(clicked()), this, SLOT(startSubstitledVideo()));
+
+	//	QObject::connect(subtitle.get(), SIGNAL(newImage(QImage)), this, SLOT(updateBottomImage(QImage)));
+	QObject::connect(subtitle.get(), SIGNAL(newImage(QImage)), &player, SLOT(onSubtitleFrameArrive(QImage)), Qt::DirectConnection);
+	QObject::connect(&player, SIGNAL(newFrame(QImage, QImage)), subtitle.get(), SLOT(requestNewFrame())); // syncing the frames between player and subtitle
+}
+
+void ShironekoTranslate::selectAndLoadVideo() {
+	sourceFile = QFileDialog::getOpenFileName(this, tr("Select Source"));
+	destinationFile = QFileDialog::getSaveFileName(this, tr("Select Target"), "", tr("Video File (*.avi)"));
+
+	if (QDir().exists(destinationFile.left(destinationFile.lastIndexOf('.')) + ".mp4")) {
+		// the final file is mp4, so we have to check it too
+		reportError(tr("The final file is mp4, which exists"));
+	}
+	auto state = player.loadVideo(QDir::toNativeSeparators(sourceFile), QDir::toNativeSeparators(destinationFile));
+
+	if (state != ShironekoVideoPlayer::Success) {
+		if (state == ShironekoVideoPlayer::VaribalFPS) {
+			fixVariableFps();
+			state = player.loadVideo(QDir::toNativeSeparators(sourceFile), QDir::toNativeSeparators(destinationFile));
+			if (state != ShironekoVideoPlayer::Success) {
+				reportError(tr("Fix failed"));
+			}
+		}
+		else {
+			switch (state) {
+			case ShironekoVideoPlayer::NoDecoder:
+				reportError(tr("Can't use this source file"));
+				break;
+			case ShironekoVideoPlayer::NoEncoder:
+				reportError(tr("No encoder!"));
+				break;
+			case ShironekoVideoPlayer::WriteError:
+				reportError(tr("Can't write to file"));
+				break;
+			default:
+				reportError(tr("Unknow error, wait.."));
+			}
+		}
+	}
+}
+
+
+void ShironekoTranslate::reportError(QString error) {
 	QMessageBox box(QMessageBox::Warning, tr("Error"), error, QMessageBox::Ok);
 	box.exec();
+
+	QApplication::exit(-1);
 }

@@ -2,9 +2,6 @@
 #include <QFile>
 #include <qtextstream.h>
 
-FinalizerCreater::~FinalizerCreater() {
-}
-
 void FinalizerCreater::generateCommand(QString filename) {
 	QFile f(filename);
 	f.open(QIODevice::WriteOnly);

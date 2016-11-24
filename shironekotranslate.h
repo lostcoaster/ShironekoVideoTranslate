@@ -24,9 +24,14 @@ private:
 
 	int finishCountDown;
 	void finishVideo();
+	bool fixVariableFps();
+
+	void initConnections();
+	void selectAndLoadVideo();
 
 	signals:
 	void subtitleChanged(QImage);
+	void quitApplication();
 
 private slots:
 	void updateImage(QImage, QImage);
@@ -36,5 +41,6 @@ private slots:
 	void startSubtitle();
 	void stopLastSubtitle();
 	void finish();
-	void reportError(QString error) const;
+	void reportError(QString error);
+	void initialize();
 };

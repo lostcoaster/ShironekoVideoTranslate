@@ -8,8 +8,7 @@ class FinalizerCreater : public QObject
 	Q_OBJECT
 
 public:
-	FinalizerCreater(): secStart(0) { ffmpegPath = QDir::current().filePath("ffmpeg"); }
-	~FinalizerCreater();
+	FinalizerCreater(QObject* parent):QObject(parent), secStart(0) { ffmpegPath = QDir::current().filePath("ffmpeg"); }
 
 	void generateCommand(QString filename);
 	void setSourceFile(QString name) { sourceFile = name; }

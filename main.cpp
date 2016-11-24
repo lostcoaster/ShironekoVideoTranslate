@@ -14,6 +14,7 @@ int main(int argc, char *argv[])
 	a.installTranslator(&translator);
 
     ShironekoTranslate w;
-    w.show();
-    return a.exec();
+	w.show();
+	QTimer::singleShot(0, &w, SLOT(initialize())); // trigger this when event loop is ready
+	return a.exec();
 }

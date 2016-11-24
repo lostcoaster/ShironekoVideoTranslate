@@ -6,7 +6,7 @@ class MarkDetector : public MatProcessor
 {
 	Q_OBJECT
 public:
-	MarkDetector();
+	MarkDetector(QObject * parent);
 	~MarkDetector();
 	virtual void processImage(cv::Mat) override;
 	void initialize() { countThree = 0; subtitleStarted = true; emit subtitleStart(); }

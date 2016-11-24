@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <QTime>
 #include <QMutex>
+#include <qelapsedtimer.h>
 
 /*todo : problems
  1. resized arrows can be detected (maybe we should use color filtering)problem: 
@@ -18,10 +19,15 @@
 class ShironekoVideoPlayer : public QObject {
 	Q_OBJECT
 public:
-	ShironekoVideoPlayer();;
+	ShironekoVideoPlayer(QObject * parent);;
 	~ShironekoVideoPlayer();
 
-	bool loadVideo(QString file, QString output = "");
+	enum OpenState {
+		Success, NoDecoder, NoEncoder, WriteError, VaribalFPS
+	};
+
+	OpenState loadVideo(QString file, QString output);
+	void releaseAll();
 	double getFrameRate() const { return frameRate; }
 	int getFrameNumber() { return capture.get(CV_CAP_PROP_POS_FRAMES); }
 	int getTotalFrameNumber() { return capture.get(CV_CAP_PROP_FRAME_COUNT); }
@@ -50,12 +56,13 @@ private:
 	cv::Mat subtitleImage;
 	cv::Rect cropPart;
 	QTimer nextFrameTimer;
+	QElapsedTimer processingTimer;
 
 	cv::Size sourceSize;
 	bool recording;
 	QMutex subtitleImageMutex;
 private:
-	void checkCodecs();
+	int checkCodecs();
 public slots:
 	//void processedMat(cv::Mat m);
 	void playVideo();

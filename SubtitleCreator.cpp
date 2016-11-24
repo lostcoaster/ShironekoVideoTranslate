@@ -3,7 +3,7 @@
 #include <QtConcurrent/QtConcurrent>
 #include <iostream>
 
-SubtitleCreator::SubtitleCreator(QSize mainFrameSize) {
+SubtitleCreator::SubtitleCreator(QObject *parent, QSize mainFrameSize):QObject(parent) {
 	fonts.push_back(QFont("LiSu", 28, 99)); // title
 	colors.push_back(Qt::white);
 	fonts.push_back(QFont("Microsoft Yahei", 24, 60)); // normal
