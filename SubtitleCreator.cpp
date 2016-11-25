@@ -373,6 +373,7 @@ void SubtitleCreator::separateLine(QString line) {
 		toDraw.push_back(QImage()); // dummy null img
 		isBackground = true;
 	}
+	line.replace(QString("\\\\"), QString("\n"));
 
 	//	for (auto i = 0; i < line.length(); i += textWidthPerLine) {
 	//		toDraw.push_back(paintText(line.mid(i, textWidthPerLine).trimmed(), isBackground ? LineType::BACKGROUND : LineType::NORMAL));
